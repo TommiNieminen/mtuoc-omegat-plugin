@@ -25,7 +25,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package org.omegat.connectors.machinetranslators.azure;
+package org.omegat.connectors.machinetranslators.mtuoc;
 
 import org.omegat.util.Language;
 import org.omegat.util.Preferences;
@@ -90,60 +90,11 @@ public class TestMicrosoftTranslatorAzure {
     }
 
     /**
-     * Check microsoft translator legacy v2 connection.
-     * @param wireMockRuntimeInfo wiremock
-     * @throws Exception when I/O error.
-     */
-    @Test
-    void testResponseV2(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
-        File prefsFile = new File(tmpDir, Preferences.FILE_PREFERENCES);
-        Preferences.IPreferences prefs = new PreferencesImpl(new PreferencesXML(null, prefsFile));
-        prefs.setPreference(MicrosoftTranslatorAzure.ALLOW_MICROSOFT_TRANSLATOR_AZURE, true);
-        prefs.setPreference(MicrosoftTranslatorAzure.PROPERTY_V2, true);
-        prefs.setPreference(MicrosoftTranslatorAzure.PROPERTY_NEURAL, false);
-        init(prefsFile.getAbsolutePath());
-
-        String text = "Buy tomorrow";
-        String translation = "Morgen kaufen gehen ein";
-
-        WireMock wireMock = wireMockRuntimeInfo.getWireMock();
-        wireMock.register(post(urlPathEqualTo(TOKEN_PATH))
-                .withHeader("Content-Type", equalTo("application/json"))
-                .withHeader("Accept", equalTo("application/jwt"))
-                .withHeader("Ocp-Apim-Subscription-Key", equalTo(KEY))
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "text/plain")
-                        .withBody("PSEUDOTOKEN")));
-        Map<String, StringValuePattern> expectedParams = new HashMap<>();
-        expectedParams.put("text", equalTo(text));
-        expectedParams.put("from", equalTo("en"));
-        expectedParams.put("to", equalTo("de"));
-        expectedParams.put("appid", containing("PSEUDOTOKEN"));
-        expectedParams.put("contentType", containing("text/plain"));
-        wireMock.register(get(urlPathEqualTo(V2_API_PATH))
-                .withQueryParams(expectedParams)
-                .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/xml")
-                        .withBody("<string xmlns=\"http://schemas.microsoft.com/2003/10/Serialization/\">" + translation
-                                + "</string>")));
-        int port = wireMockRuntimeInfo.getHttpPort();
-
-        MicrosoftTranslatorAzure azure = new MicrosoftTranslatorAzureMock();
-        MicrosoftTranslatorV2 translator = new MicrosoftTranslatorV2(azure);
-        translator.setTokenUrl(String.format("http://localhost:%d%s", port, TOKEN_PATH));
-        translator.setUrl(String.format("http://localhost:%d%s", port, V2_API_PATH));
-        String result = translator.translate(new Language("EN"), new Language("DE"), text);
-        Assertions.assertEquals(translation, result);
-    }
-
-    /**
      * Initialize preferences for test.
      * @param configDir to create omegat.prefs.
      */
-    public static synchronized void init(String configDir) {
-        RuntimePreferences.setConfigDir(configDir);
+    public static synchronized void init(String configFilePath) {
+        RuntimePreferences.setConfigDir(new File(configFilePath).getParent());
         Preferences.init();
         Preferences.initFilters();
         Preferences.initSegmentation();
@@ -152,15 +103,10 @@ public class TestMicrosoftTranslatorAzure {
     /**
      * A mock for parent class.
      */
-    static class MicrosoftTranslatorAzureMock extends MicrosoftTranslatorAzure {
+    static class MtuocPluginMock extends MtuocPlugin {
         @Override
         protected String getKey() {
             return KEY;
-        }
-
-        @Override
-        protected String getRegion() {
-            return REGION;
         }
 
         @Override
@@ -168,13 +114,13 @@ public class TestMicrosoftTranslatorAzure {
     }
 
     @Test
-    void testResponseV3(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
+    void testResponse(WireMockRuntimeInfo wireMockRuntimeInfo) throws Exception {
         File prefsFile = new File(tmpDir, Preferences.FILE_PREFERENCES);
         Preferences.IPreferences prefs = new PreferencesImpl(new PreferencesXML(null, prefsFile));
-        prefs.setPreference(MicrosoftTranslatorAzure.ALLOW_MICROSOFT_TRANSLATOR_AZURE, true);
-        prefs.setPreference(MicrosoftTranslatorAzure.PROPERTY_V2, false);
-        prefs.setPreference(MicrosoftTranslatorAzure.PROPERTY_NEURAL, false);
-        prefs.setPreference(MicrosoftTranslatorAzure.PROPERTY_REGION, REGION);
+        prefs.setPreference(MtuocPlugin.ALLOW_MTUOC, true);
+        prefs.setPreference(MtuocPlugin.PROPERTY_MT_ENGINE_URL, "http://172.20.137.165");
+        prefs.setPreference(MtuocPlugin.PROPERTY_MT_ENGINE_PORT, "8011");
+        prefs.save();
         init(prefsFile.getAbsolutePath());
 
         String text = "Buy tomorrow";
@@ -182,22 +128,20 @@ public class TestMicrosoftTranslatorAzure {
 
         WireMock wireMock = wireMockRuntimeInfo.getWireMock();
         Map<String, StringValuePattern> expectedParams = new HashMap<>();
-        expectedParams.put("api-version", equalTo("3.0"));
-        expectedParams.put("from", equalTo("en"));
-        expectedParams.put("to", equalTo("de"));
-        wireMock.register(post(urlPathEqualTo(V3_API_PATH))
+        expectedParams.put("text", equalTo(text));
+        expectedParams.put("id", equalTo("1"));
+        wireMock.register(post(urlPathEqualTo(MtuocPlugin.PROPERTY_MT_ENGINE_URL))
                 .withQueryParams(expectedParams)
-                .withHeader("Ocp-Apim-Subscription-Key", equalTo(KEY))
-                .withHeader("Ocp-Apim-Subscription-Region", equalTo(REGION))
                 .withHeader("Content-Type", containing("application/json"))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody("[{\"translations\": [ {\"text\": \"" + translation + "\"}]}]")));
         int port = wireMockRuntimeInfo.getHttpPort();
-        MicrosoftTranslatorAzure azure = new MicrosoftTranslatorAzureMock();
-        AzureTranslatorV3 translator = new AzureTranslatorV3(azure);
-        translator.setUrl(String.format("http://localhost:%d%s?api-version=3.0", port, V3_API_PATH));
+        MtuocPluginMock mtuoc = new MtuocPluginMock();
+
+        MtuocTranslator translator = new MtuocTranslator(mtuoc, mtuoc.GetTranslateEndpointUrl());
+        //translator.setUrl(String.format("http://localhost:%d%s?api-version=3.0", port, V3_API_PATH));
         String result = translator.translate(new Language("EN"), new Language("DE"), text);
         Assertions.assertEquals(translation, result);
     }

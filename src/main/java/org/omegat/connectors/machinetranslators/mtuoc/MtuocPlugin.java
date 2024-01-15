@@ -25,7 +25,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package org.omegat.connectors.machinetranslators.azure;
+package org.omegat.connectors.machinetranslators.mtuoc;
 
 import org.omegat.core.Core;
 import org.omegat.core.machinetranslators.BaseCachedTranslate;
@@ -43,8 +43,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ResourceBundle;
 
-import javax.swing.JCheckBox;
-
 /**
  * Support for Microsoft Translator API machine translation.
  *
@@ -56,23 +54,25 @@ import javax.swing.JCheckBox;
  * @see <a href="https://www.microsoft.com/en-us/translator/translatorapi.aspx">Translator API</a>
  * @see <a href="https://docs.microsofttranslator.com/text-translate.html">Translate Method reference</a>
  */
-public class MicrosoftTranslatorAzure extends BaseCachedTranslate implements IMachineTranslation {
+public class MtuocPlugin extends BaseCachedTranslate implements IMachineTranslation {
 
-    protected static final String ALLOW_MICROSOFT_TRANSLATOR_AZURE = "allow_microsoft_translator_azure";
+    protected static final String ALLOW_MTUOC = "allow_mtuoc";
 
-    protected static final String PROPERTY_NEURAL = "microsoft.neural";
-    protected static final String PROPERTY_V2 = "microsoft.v2";
-    protected static final String PROPERTY_SUBSCRIPTION_KEY = "microsoft.api.subscription_key";
-    protected static final String PROPERTY_REGION = "microsoft.api.region";
+    protected static final String PROPERTY_MT_ENGINE_URL = "mtuoc.engine_url";//"http://172.20.137.165"
 
-    private static final ResourceBundle BUNDLE = ResourceBundle.getBundle("AzureTranslatorBundle");
+    protected static final String PROPERTY_MT_ENGINE_PORT = "mtuoc.engine_port";//8011
 
-    private MicrosoftTranslatorBase translator = null;
+    //Not used yet, keep for later possible use
+    protected static final String PROPERTY_API_KEY = "mtuoc.apikey";
+
+    private static final ResourceBundle BUNDLE = ResourceBundle.getBundle("MtuocBundle");
+
+    private MtuocTranslatorBase translator = null;
 
     /**
      * Constructor of the connector.
      */
-    public MicrosoftTranslatorAzure() {
+    public MtuocPlugin() {
         super();
     }
 
@@ -98,7 +98,7 @@ public class MicrosoftTranslatorAzure extends BaseCachedTranslate implements IMa
                     clazz.getMethod("compareVersions", String.class, String.class, String.class, String.class);
             if ((int) compareVersions.invoke(clazz, OStrings.VERSION, OStrings.UPDATE, requiredVersion, requiredUpdate)
                     < 0) {
-                Core.pluginLoadingError("MicrosoftTranslatorAzure Plugin cannot be loaded because OmegaT Version "
+                Core.pluginLoadingError("MTUOC Plugin cannot be loaded because OmegaT Version "
                         + OStrings.VERSION + " is lower than required version " + requiredVersion);
                 return;
             }
@@ -107,10 +107,10 @@ public class MicrosoftTranslatorAzure extends BaseCachedTranslate implements IMa
                 | IllegalAccessException
                 | InvocationTargetException e) {
             Core.pluginLoadingError(
-                    "MicrosoftTranslatorAzure cannot be loaded because this OmegaT version is not supported");
+                    "MTUOC plugin cannot be loaded because this OmegaT version is not supported");
             return;
         }
-        Core.registerMachineTranslationClass(MicrosoftTranslatorAzure.class);
+        Core.registerMachineTranslationClass(MtuocPlugin.class);
     }
 
     /**
@@ -125,12 +125,12 @@ public class MicrosoftTranslatorAzure extends BaseCachedTranslate implements IMa
      * @return connector name.
      */
     public String getName() {
-        return getString("MT_ENGINE_MICROSOFT_AZURE");
+        return getString("MT_ENGINE_MTUOC");
     }
 
     @Override
     protected String getPreferenceName() {
-        return ALLOW_MICROSOFT_TRANSLATOR_AZURE;
+        return ALLOW_MTUOC;
     }
 
     /**
@@ -172,25 +172,33 @@ public class MicrosoftTranslatorAzure extends BaseCachedTranslate implements IMa
     }
 
     protected void setKey(String key, boolean temporary) {
-        setCredential(PROPERTY_SUBSCRIPTION_KEY, key, temporary);
+        setCredential(PROPERTY_API_KEY, key, temporary);
     }
 
     protected String getKey() throws Exception {
-        String key = getCredential(PROPERTY_SUBSCRIPTION_KEY);
+        String key = getCredential(PROPERTY_API_KEY);
         if (StringUtil.isEmpty(key)) {
-            throw new Exception(getString("MT_ENGINE_MICROSOFT_SUBSCRIPTION_KEY_NOTFOUND"));
+            throw new Exception(getString("MT_ENGINE_API_KEY_NOTFOUND"));
         }
         return key;
     }
 
     @Override
     protected String translate(Language sLang, Language tLang, String text) throws Exception {
-        if (isV2() && (translator == null || translator instanceof AzureTranslatorV3)) {
-            translator = new MicrosoftTranslatorV2(this);
-        } else if (translator == null || translator instanceof MicrosoftTranslatorV2) {
-            translator = new AzureTranslatorV3(this);
-        }
+        translator = new MtuocTranslator(this,this.GetTranslateEndpointUrl());
         return translator.translate(sLang, tLang, text);
+    }
+
+    public String GetTranslateEndpointUrl() {
+        String url = Preferences.getPreferenceDefault(PROPERTY_MT_ENGINE_URL,null);
+        String port = Preferences.getPreferenceDefault(PROPERTY_MT_ENGINE_PORT,null);
+        if (url == null || port == null) {
+            return "";
+        }
+        else {
+            return String.format("%s:%s/translate", url, port);
+        }
+
     }
 
     @Override
@@ -204,52 +212,40 @@ public class MicrosoftTranslatorAzure extends BaseCachedTranslate implements IMa
      * @see <a href="https://sourceforge.net/p/omegat/feature-requests/1366/">Add support for
      * Microsoft neural machine translation</a>
      */
-    protected boolean isNeural() {
-        return Preferences.isPreference(PROPERTY_NEURAL);
-    }
-
-    protected boolean isV2() {
-        return Preferences.isPreference(PROPERTY_V2);
-    }
-
-    protected String getRegion() {
-        return Preferences.getPreferenceDefault(MicrosoftTranslatorAzure.PROPERTY_REGION, "");
-    }
 
     @Override
     public void showConfigurationUI(Window parent) {
-        JCheckBox neuralCheckBox = new JCheckBox(getString("MT_ENGINE_MICROSOFT_NEURAL_LABEL"));
-        neuralCheckBox.setSelected(isNeural());
-        JCheckBox v2CheckBox = new JCheckBox(getString("MT_ENGINE_MICROSOFT_V2_LABEL"));
-        v2CheckBox.setSelected(isV2());
-        neuralCheckBox.setEnabled(isV2());
-        v2CheckBox.addActionListener(e -> neuralCheckBox.setEnabled(v2CheckBox.isSelected()));
-        v2CheckBox.setToolTipText(getString("MT_ENGINE_MICROSOFT_V3_NOT_IMPLEMENTED"));
 
         MTConfigDialog dialog = new MTConfigDialog(parent, getName()) {
             @Override
             protected void onConfirm() {
-                setKey(panel.valueField1.getText().trim(), panel.temporaryCheckBox.isSelected());
-                Preferences.setPreference(PROPERTY_NEURAL, neuralCheckBox.isSelected());
-                Preferences.setPreference(PROPERTY_V2, v2CheckBox.isSelected());
+                //Set the API key, not use yet
+                //setKey(panel.valueField1.getText().trim(), panel.temporaryCheckBox.isSelected());
                 Preferences.setPreference(
-                        PROPERTY_REGION, panel.valueField2.getText().trim());
+                        PROPERTY_MT_ENGINE_URL, panel.valueField1.getText().trim());
+                Preferences.setPreference(
+                        PROPERTY_MT_ENGINE_PORT, panel.valueField2.getText().trim());
             }
         };
-        dialog.panel.valueLabel1.setText(getString("MT_ENGINE_MICROSOFT_SUBSCRIPTION_KEY_LABEL"));
-        dialog.panel.valueField1.setText(getCredential(PROPERTY_SUBSCRIPTION_KEY));
+        //Keep these if API key functionality added
+        //dialog.panel.valueLabel1.setText(getString("MT_ENGINE_MTUOC_KEY_LABEL"));
+        //dialog.panel.valueField1.setText(getCredential(PROPERTY_API_KEY));
         int height = dialog.panel.getFont().getSize();
-        dialog.panel.valueField1.setPreferredSize(new Dimension(height * 24, height * 2));
-        dialog.panel.valueLabel2.setText(getString("MT_ENGINE_MICROSOFT_SUBSCRIPTION_REGION"));
-        dialog.panel.valueField2.setText(Preferences.getPreferenceDefault(PROPERTY_REGION, ""));
+        //dialog.panel.valueField1.setPreferredSize(new Dimension(height * 24, height * 2));
+        dialog.panel.valueLabel1.setText(getString("MT_ENGINE_URL"));
+        dialog.panel.valueField1.setText(Preferences.getPreferenceDefault(PROPERTY_MT_ENGINE_URL, ""));
+        dialog.panel.valueField1.setPreferredSize(new Dimension(height * 12, height * 2));
+        dialog.panel.valueLabel2.setText(getString("MT_ENGINE_PORT"));
+        dialog.panel.valueField2.setText(Preferences.getPreferenceDefault(PROPERTY_MT_ENGINE_PORT, ""));
         dialog.panel.valueField2.setPreferredSize(new Dimension(height * 12, height * 2));
 
+
         boolean isCredentialStoredTemporarily =
-                !CredentialsManager.getInstance().isStored(PROPERTY_SUBSCRIPTION_KEY)
-                        && !System.getProperty(PROPERTY_SUBSCRIPTION_KEY, "").isEmpty();
+                !CredentialsManager.getInstance().isStored(PROPERTY_API_KEY)
+                        && !System.getProperty(PROPERTY_API_KEY, "").isEmpty();
         dialog.panel.temporaryCheckBox.setSelected(isCredentialStoredTemporarily);
-        dialog.panel.itemsPanel.add(v2CheckBox);
-        dialog.panel.itemsPanel.add(neuralCheckBox);
+        //dialog.panel.itemsPanel.add(v2CheckBox);
+        //dialog.panel.itemsPanel.add(neuralCheckBox);
 
         dialog.show();
     }

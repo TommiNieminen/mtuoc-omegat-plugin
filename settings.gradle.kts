@@ -1,4 +1,4 @@
-rootProject.name = "AzureTranslatePlugin"
+rootProject.name = "MtuocTranslatePlugin"
 pluginManagement {
   repositories {
       mavenLocal()

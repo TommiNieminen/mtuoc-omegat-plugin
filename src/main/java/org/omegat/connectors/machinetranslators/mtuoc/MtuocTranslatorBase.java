@@ -25,7 +25,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package org.omegat.connectors.machinetranslators.azure;
+package org.omegat.connectors.machinetranslators.mtuoc;
 
 import org.omegat.util.Language;
 
@@ -39,30 +39,15 @@ import org.omegat.util.Language;
  * @see <a href="https://www.microsoft.com/en-us/translator/translatorapi.aspx">Translator API</a>
  * @see <a href="https://docs.microsofttranslator.com/text-translate.html">Translate Method reference</a>
  */
-public abstract class MicrosoftTranslatorBase {
+public abstract class MtuocTranslatorBase {
 
-    protected final MicrosoftTranslatorAzure parent;
+    protected final MtuocPlugin parent;
 
-    public MicrosoftTranslatorBase(MicrosoftTranslatorAzure parent) {
+    public MtuocTranslatorBase(MtuocPlugin parent) {
         this.parent = parent;
     }
 
-    /**
-     * Converts language codes to Microsoft ones.
-     * @param language
-     *              a project language
-     * @return either a language code, or a Chinese language code plus a Microsoft variant
-     */
-    protected String checkMSLang(Language language) {
-        String lang = language.getLanguage();
-        if (lang.equalsIgnoreCase("zh-cn")) {
-            return "zh-CHS";
-        } else if (lang.equalsIgnoreCase("zh-tw") || lang.equalsIgnoreCase("zh-hk")) {
-            return "zh-CHT";
-        } else {
-            return language.getLanguageCode();
-        }
-    }
+
 
     /**
      * translate text.
@@ -73,8 +58,9 @@ public abstract class MicrosoftTranslatorBase {
      * @throws Exception when connection error.
      */
     protected synchronized String translate(Language sLang, Language tLang, String text) throws Exception {
-        String langFrom = checkMSLang(sLang);
-        String langTo = checkMSLang(tLang);
+        //Languages are not currently used in MTUOC, but keep these for later use
+        String langFrom = sLang.getLanguage();
+        String langTo = tLang.getLanguage();
         return requestTranslate(langFrom, langTo, text);
     }
 

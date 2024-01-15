@@ -42,7 +42,7 @@ java {
 
 omegat {
     version("5.8.0") // target java version is 8
-    pluginClass("org.omegat.connectors.machinetranslators.azure.MicrosoftTranslatorAzure")
+    pluginClass("org.omegat.connectors.machinetranslators.mtuoc.MtuocPlugin")
     packIntoJarFileFilter = {it.exclude("META-INF/**/*", "module-info.class", "kotlin/**/*")}
 }
 

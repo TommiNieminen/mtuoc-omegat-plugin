@@ -25,11 +25,10 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-package org.omegat.connectors.machinetranslators.azure;
+package org.omegat.connectors.machinetranslators.mtuoc;
 
 import org.omegat.util.HttpConnectionUtils;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -41,32 +40,29 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * Support for Microsoft Translator API machine translation.
  * @author Hiroshi Miura
  */
-public class AzureTranslatorV3 extends MicrosoftTranslatorBase {
+public class MtuocTranslator extends MtuocTranslatorBase {
 
-    private static final String DEFAULT_URL = "https://api.cognitive.microsofttranslator.com/translate?api-version=3.0";
+
 
     private String urlTranslate;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public AzureTranslatorV3(MicrosoftTranslatorAzure parent) {
+    public MtuocTranslator(MtuocPlugin parent, String translateEndpointUrl) {
         super(parent);
-        urlTranslate = DEFAULT_URL;
+        urlTranslate = translateEndpointUrl;
     }
 
     @Override
     protected String requestTranslate(String langFrom, String langTo, String text) throws Exception {
         Map<String, String> p = new TreeMap<>();
-        p.put("Ocp-Apim-Subscription-Key", parent.getKey());
-        p.put("Ocp-Apim-Subscription-Region", parent.getRegion());
-        String url = urlTranslate + "&from=" + langFrom + "&to=" + langTo;
+        //Modify this if API key support is need
+        //p.put("Ocp-Apim-Subscription-Key", parent.getKey());
+        String url = urlTranslate;
         String json = createJsonRequest(text);
         String res = HttpConnectionUtils.postJSON(url, json, p);
-        JsonNode root = mapper.readTree(res);
-        JsonNode translations = root.get(0).get("translations");
-        if (translations == null) {
-            return null;
-        }
-        JsonNode translation = translations.get(0).get("text");
+        JsonNode root = mapper.readValue(res,JsonNode.class);
+        JsonNode translation = root.get("tgt");
+
         if (translation == null) {
             return null;
         }
@@ -82,11 +78,12 @@ public class AzureTranslatorV3 extends MicrosoftTranslatorBase {
     }
 
     /**
-     * Create Watson request and return as json string.
+     * Create request and return as json string.
      */
     protected String createJsonRequest(String trText) throws JsonProcessingException {
         Map<String, Object> param = new TreeMap<>();
-        param.put("text", trText);
-        return new ObjectMapper().writeValueAsString(Collections.singletonList(param));
+        param.put("src", trText);
+        param.put("id", java.util.UUID.randomUUID());
+        return new ObjectMapper().writeValueAsString(param);
     }
 }

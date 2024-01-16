@@ -1,7 +1,6 @@
-# Azure Translate V2/V3 plugin for OmegaT
+# MTUOC plugin for OmegaT
 
-Current status is assumed as an _Alpha_ status.
-Microsoft Translator v2 support was ported from OmegaT 5.7.1.
+This is an OmegaT plugin for the MTUOC MT system. This plugin has been created based on the https://github.com/omegat-org/azure-translate-plugin.git Azure plugin for OmegaT.
 
 ## Installation
 

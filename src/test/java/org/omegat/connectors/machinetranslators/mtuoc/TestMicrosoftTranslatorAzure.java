@@ -104,13 +104,7 @@ public class TestMicrosoftTranslatorAzure {
      * A mock for parent class.
      */
     static class MtuocPluginMock extends MtuocPlugin {
-        @Override
-        protected String getKey() {
-            return KEY;
-        }
 
-        @Override
-        protected void setKey(String val, boolean temporary) {}
     }
 
     @Test

@@ -36,6 +36,7 @@ import org.omegat.util.Language;
 import org.omegat.util.OStrings;
 import org.omegat.util.Preferences;
 import org.omegat.util.StringUtil;
+import org.omegat.util.Log;
 
 import java.awt.Dimension;
 import java.awt.Window;
@@ -186,7 +187,15 @@ public class MtuocPlugin extends BaseCachedTranslate implements IMachineTranslat
     @Override
     protected String translate(Language sLang, Language tLang, String text) throws Exception {
         translator = new MtuocTranslator(this,this.GetTranslateEndpointUrl());
-        return translator.translate(sLang, tLang, text);
+        String translation = translator.translate(sLang, tLang, text);
+        if (translation != null)
+        {
+            return translation;
+        }
+        else {
+            Log.logWarningRB("MT_ENGINE_NO_RESPONSE");
+            return null;
+        }
     }
 
     public String GetTranslateEndpointUrl() {
@@ -206,21 +215,12 @@ public class MtuocPlugin extends BaseCachedTranslate implements IMachineTranslat
         return true;
     }
 
-    /**
-     * Whether to use a v2 Neural Machine Translation System.
-     *
-     * @see <a href="https://sourceforge.net/p/omegat/feature-requests/1366/">Add support for
-     * Microsoft neural machine translation</a>
-     */
-
     @Override
     public void showConfigurationUI(Window parent) {
 
         MTConfigDialog dialog = new MTConfigDialog(parent, getName()) {
             @Override
             protected void onConfirm() {
-                //Set the API key, not use yet
-                //setKey(panel.valueField1.getText().trim(), panel.temporaryCheckBox.isSelected());
                 Preferences.setPreference(
                         PROPERTY_MT_ENGINE_URL, panel.valueField1.getText().trim());
                 Preferences.setPreference(
@@ -239,13 +239,6 @@ public class MtuocPlugin extends BaseCachedTranslate implements IMachineTranslat
         dialog.panel.valueField2.setText(Preferences.getPreferenceDefault(PROPERTY_MT_ENGINE_PORT, ""));
         dialog.panel.valueField2.setPreferredSize(new Dimension(height * 12, height * 2));
 
-
-        boolean isCredentialStoredTemporarily =
-                !CredentialsManager.getInstance().isStored(PROPERTY_API_KEY)
-                        && !System.getProperty(PROPERTY_API_KEY, "").isEmpty();
-        dialog.panel.temporaryCheckBox.setSelected(isCredentialStoredTemporarily);
-        //dialog.panel.itemsPanel.add(v2CheckBox);
-        //dialog.panel.itemsPanel.add(neuralCheckBox);
 
         dialog.show();
     }
